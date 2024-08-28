@@ -1,0 +1,9 @@
+Makefile: special file used to automate the process of compiling and building the project.
+->used by 'make' utility -  a build automation tool to manage dependencies and compile code
+
+
+//Key concepts of Makefile:
+1. Targets: files we want to generate (eg executable files);
+2. Dependencies: files required to run first in order to build the target. if any of these files are changes then the target is rebuilt
+3. Rules: specifies how to make the target. includes: target, its dependencies, commands needed to create the target
+4. Commands: actual shell commands that are needed to make the target. usually involve invoking the compiler (gcc) with apt options
