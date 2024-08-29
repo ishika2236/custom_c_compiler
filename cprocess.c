@@ -16,14 +16,19 @@ struct compile_process* compile_process_create(const char* filename, const char*
     // this step is if the output filename is passed as params, if not then this step is not valid as sometimes we don't want to build an executable instead we just show it on the terminal
     if(out_filename)
     {
-        FILE* out_file = fopen(out_filename, "w");
+        out_file = fopen(out_filename, "w");
         if(!out_file)
         {
+            fclose(file);
             return NULL;
         }
     }
     
     struct compile_process* process = calloc(1, sizeof(struct compile_process));
     process -> flags = flags;
+    process -> cfile.fp = file;
+    process -> ofile = out_file;
+
+    return process;
 
 };
