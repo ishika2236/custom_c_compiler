@@ -18,7 +18,24 @@ This project is a simple compiler written in C, designed to compile C source fil
    - Object files are linked together to create the final executable.
 
 2. **Lexical Analysis**:
-   - The first step in the compilation process, where the source code is broken down into tokens. This step is crucial for parsing and understanding the code structure.
+   - The first step in the compilation process, where the source code is broken down into tokens.
+   - A token has a type and a value
+   - The part of a software program that performs lexical analysis is called lexer
+   - Benefits:
+        - idenitfy source code keywords, symbols, operators and more
+        - less work for the parser
+        - token info is in correct format (i.e. numbers are actually integers not string once processed by the lexers)
+        - unecessary info such as blank spaces are discarded
+
+    - Token types in our compiler:
+        - TOKEN_TYPE_IDENTIFIER (words that are not keywords)
+        - TOKEN_TYPE_KEYWORD (unsigned, signed, int,, float, double, long, void, struct etc)
+        - TOKEN_TYPE_OPERATOR (+,-,/,* etc)
+        - TOKEN_TYPE_SYMBOL ('',"",;,:,etc)
+        - TOKEN_TYPE_NUMBER (1,2,3,23 etc)
+        - TOKEN_TYPE_STRING  ("ehllo world", etc)
+        - TOKEN_TYPE_COMMENT (c program comment)
+        - TOKEN_TYPE_NEWLINE (new line in program)
 
 3. **Parsing**:
    - After lexical analysis, the compiler parses the tokens to create a syntax tree, which represents the hierarchical structure of the source code.
