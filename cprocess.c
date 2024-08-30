@@ -3,32 +3,56 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "compiler.h"
-struct compile_process* compile_process_create(const char* filename, const char* out_filename, int flags)
-{
-    FILE* file = fopen(filename, "r");
 
-    if(!file)
+struct compile_process* compile_process_create(const char* filename, const char* out_filename, int flags) {
+    FILE *file = fopen(filename, "r");
+    if (!file)
     {
         return NULL;
     }
-    
-    FILE* out_file = NULL;
-    // this step is if the output filename is passed as params, if not then this step is not valid as sometimes we don't want to build an executable instead we just show it on the terminal
-    if(out_filename)
+
+    FILE *out_file = NULL;
+    if (out_filename)
     {
         out_file = fopen(out_filename, "w");
-        if(!out_file)
+        if (!out_file)
         {
-            fclose(file);
             return NULL;
         }
     }
-    
+
     struct compile_process* process = calloc(1, sizeof(struct compile_process));
-    process -> flags = flags;
-    process -> cfile.fp = file;
-    process -> ofile = out_file;
+    process->flags = flags;
+    process->cfile.fp = file;
+    process->ofile = out_file;
 
     return process;
+}
 
-};
+char compile_process_next_char(struct lex_process* lex_process)
+{
+    struct compile_process* compiler = lex_process->compiler;
+    compiler->pos.col += 1;
+    char c = getc(compiler->cfile.fp);
+    if (c == '\n')
+    {
+        compiler->pos.line +=1 ;
+        compiler->pos.col = 1;
+    }
+
+    return c;
+}
+
+char compile_process_peek_char(struct lex_process* lex_process)
+{
+    struct compile_process* compiler = lex_process->compiler;
+    char c = getc(compiler->cfile.fp);
+    ungetc(c, compiler->cfile.fp);
+    return c;
+}
+
+void compile_process_push_char(struct lex_process* lex_process, char c)
+{
+    struct compile_process* compiler = lex_process->compiler;
+    ungetc(c, compiler->cfile.fp);
+}
