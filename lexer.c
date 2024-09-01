@@ -1,20 +1,16 @@
 #include "compiler.h"
 #include "helpers/vector.h"
+#include "helpers/buffer.h"
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 
-#define LEX_GETC_IF(buffer, c, exp)\
-    for(c = peekc(); exp; c=peekc())\
-    {                               \
-        buffer_write(buffer, c);\
-        nextc();                \
-    }                           \
-
+    
 static struct lex_process* lex_process;
 struct token tmptoken;
-
+struct token* read_next_token();
 static char peekc(){
     return lex_process -> functions -> peek_char(lex_process);
 }
@@ -34,10 +30,7 @@ static void pushc(char c){
 
 }
 
-static struct pos lex_file_position()
-{
-    return lex_process -> pos;
-}
+
 
 
 void compiler_error(struct compile_process* compiler, const char* msg, ...)
@@ -49,7 +42,7 @@ void compiler_error(struct compile_process* compiler, const char* msg, ...)
 
   
     fprintf(stderr, "on line %d, col %d, in file %s\n", compiler->pos.line, compiler->pos.col, compiler->cfile.abs_path);
-    exit(-1);
+    exit(COMPILER_FAILED_WITH_ERRORS);
 }
 
 void compiler_warning(struct compile_process* compiler, const char* msg, ...)
@@ -63,18 +56,54 @@ void compiler_warning(struct compile_process* compiler, const char* msg, ...)
     fprintf(stderr, "on line %d, col %d, in file %s\n", compiler->pos.line, compiler->pos.col, compiler->cfile.abs_path);
     // exit(-1); // Uncomment if you want to terminate on warning
 }
-
-struct token* token_create(struct token* _token){
-    memcpy(&tmptoken, _token, sizeof(struct token));
-    tmptoken.pos =  lex_file_position();
-
+struct token* token_create_string(char start_delim, char end_delim)
+{
+    struct token* token = (struct token* )malloc(sizeof(struct token));
+    struct buffer* buffer = buffer_create();
+    assert(nextc()==start_delim);
+    char c = nextc();
+    while (c != end_delim && c != EOF) {
+        // printf("%c",c); // debug statement
+        buffer_write(buffer, c);
+        c = nextc();
+    }
+    buffer_write(buffer, 0x00);
+    token -> sval = buffer_ptr(buffer);
+    token -> type = TOKEN_TYPE_STRING;
+    token->pos = lex_process->pos;
+    printf("%s\n", token->sval);
+    return token;
 }
+struct token* token_create_number( unsigned long long number)
+{
+    struct token* token = (struct token*)malloc(sizeof(struct token));
+    token -> type =  TOKEN_TYPE_NUMBER;
+    token -> llnum =  number;
+    token -> pos = lex_process->pos;
+    printf("%lld\n", token->llnum);
+    return token;
+}
+static struct token*  lexer_last_token()
+{
+    return vector_back_or_null(lex_process -> token_vec);
+}
+
+static struct token* handle_whitespace()
+{
+  
+    nextc();
+    return read_next_token();
+}
+
 const char* read_number_str()
 {
     const char* num = NULL;
     struct buffer* buffer = buffer_create();
     char c = peekc();
-    LEX_GETC_IF(buffer, c, (c>='0' && c<='9'));
+    while((c = peekc()) >='0' && c<='9' ){ 
+        buffer_write(buffer, c); 
+        nextc(); 
+    }
 
     buffer_write(buffer, 0x00);
     return buffer_ptr(buffer);
@@ -83,33 +112,39 @@ unsigned long long read_number()
 {
     const char* s = read_number_str();
     return atoll(s);
-
 }
 
-struct token* token_make_number_for_value(unsigned long number)
-{
-    return token_create(&(struct token){.type = TOKEN_TYPE_NUMBER, .llnum= number});
-}
-struct token* token_make_number()
-{
 
-}
+
 struct token* read_next_token()
 {
     struct  token* token = NULL;
     char c = peekc();
+    
     switch (c)
     {
-        NUMERIC_CASE:
-        token = token_make_number();
+         case '0' ... '9':
+            printf("Reading next token at line %d, col %d\n", lex_process->pos.line, lex_process->pos.col);//debug statement
+            token = token_create_number(read_number());
+        break;
+        case '"':
+            printf("Reading next token at line %d, col %d\n", lex_process->pos.line, lex_process->pos.col);//debug statement
+            token = token_create_string('"','"');
+            break;
         case EOF:
             // We have finished lexical analysis on the file
             break;
+
+        case ' ':
+        case '\t':
+            token = handle_whitespace();
+        break;
         
         default:
             compiler_error(lex_process->compiler, "Unexpected Token");
             break;
     }
+   
     return token;
 }
 int lex(struct lex_process* process)
@@ -126,6 +161,8 @@ int lex(struct lex_process* process)
         vector_push(process -> token_vec, token);
         token = read_next_token();
     }
+    printf("%i\n",vector_count(process->token_vec));
+    
     return LEXICAL_ANALYSIS_ALL_OK;
 
     return 0;

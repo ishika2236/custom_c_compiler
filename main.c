@@ -5,7 +5,7 @@
 
 int main()
 {
-    int res = compile_file("./test.c", "/test",0);
+    int res = compile_file("./test.c", "./test.o",0);
     if (res == COMPILER_FILE_COMPILED_OK)
     {
         printf("file compiled successfully\n");

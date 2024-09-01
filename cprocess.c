@@ -8,18 +8,23 @@ struct compile_process* compile_process_create(const char* filename, const char*
     FILE *file = fopen(filename, "r");
     if (!file)
     {
+        // printf("couldn't open input file, check path\n"); // debug statement
         return NULL;
     }
+    // printf("input file opened successfully\n"); // debug statement
 
     FILE *out_file = NULL;
     if (out_filename)
     {
         out_file = fopen(out_filename, "w");
+        
         if (!out_file)
         {
+            // printf("counldn't open output file, check path\n"); //debug statement
             return NULL;
         }
     }
+    // printf("output file created successfully\n"); //debug statement
 
     struct compile_process* process = calloc(1, sizeof(struct compile_process));
     process->flags = flags;
