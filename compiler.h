@@ -17,6 +17,34 @@
         case '9'        
 
     // Position of a file   
+    #define OPERATOR_EXCLUDING_DIVISION \
+        case '+':                        \
+        case '-':                        \
+        case '*':                        \
+        case '(':                        \
+        case '[':                        \
+        case '~':                        \
+        case '.':                        \
+        case ',':                        \
+        case '^':                        \
+        case '&':                        \
+        case '!':                        \
+        case '?':                        \
+        case '%':                        \
+        case '<':                        \
+        case '>'                        
+    #define SYMBOL_CASE\
+        case ')':       \
+        case ']':       \
+        case ':':       \
+        case ';':       \
+        case '/':       \
+        case '\\':       \
+        case '{':       \
+        case '}':       \
+        case '#'       \
+
+
     struct pos {
         int line;
         int col;
@@ -106,6 +134,7 @@
     int lex(struct lex_process* process);
     void compiler_error(struct compile_process* compiler, const char* msg, ...);
     void compiler_warning(struct compile_process* compiler, const char* msg, ...);
+    bool is_token_keyword(struct token* token, char* keyword);
 
 
     #endif // COMPILER_H
