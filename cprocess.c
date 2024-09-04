@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "compiler.h"
+#include <string.h>
+#include "./helpers/vector.h"
 
 struct compile_process* compile_process_create(const char* filename, const char* out_filename, int flags) {
     FILE *file = fopen(filename, "r");
@@ -24,12 +26,14 @@ struct compile_process* compile_process_create(const char* filename, const char*
             return NULL;
         }
     }
+    
     // printf("output file created successfully\n"); //debug statement
 
     struct compile_process* process = calloc(1, sizeof(struct compile_process));
     process->flags = flags;
     process->cfile.fp = file;
     process->ofile = out_file;
+    process->token_vector_count++;
 
     return process;
 }
@@ -60,4 +64,29 @@ void compile_process_push_char(struct lex_process* lex_process, char c)
 {
     struct compile_process* compiler = lex_process->compiler;
     ungetc(c, compiler->cfile.fp);
+}
+struct token* parse_process_next_token(struct parse_process* parser)
+{
+    if(parser -> index < parser -> token_vector_count)
+    {
+        parser -> index++;
+        return (struct token*) vector_at(parser -> token_vector, parser->index);
+    }
+    return NULL;
+}
+bool parse_process_match(struct parse_process* parser, int type, const char* value)
+{
+    struct token* current_token = vector_at(parser -> token_vector, parser->index);
+    if(current_token -> type == type && strcmp(current_token -> sval, value) ==0)
+    {
+        return true;
+    }
+    return false;
+}
+bool parse_process_consume(struct parse_process* parser, int type, const char* value) {
+    if (parse_process_match(parser, type, value)) {
+        parse_process_next_token(parser);
+        return true;
+    }
+    return false;
 }

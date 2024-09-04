@@ -1,5 +1,6 @@
-100000 // hello
-
-/* 
-hello its me trying this stupid mutline char token functionality
-*/
+int main()
+{
+    for(int i = 0 ; i < 10; i++){
+        printf(i);
+    }
+}

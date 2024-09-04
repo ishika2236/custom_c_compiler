@@ -32,7 +32,9 @@
         case '?':                        \
         case '%':                        \
         case '<':                        \
-        case '>'                        
+        case '>':                      \
+        case '='
+
     #define SYMBOL_CASE\
         case ')':       \
         case ']':       \
@@ -122,7 +124,33 @@
             FILE* fp;
             const char* abs_path;
         } cfile;
+        struct vector* token_vec;
+        int token_vector_count;
         FILE* ofile;
+    };
+
+    struct parse_process {
+        int flags;
+        struct compile_process* compiler;
+        struct parse_process_functions* functions;
+        struct vector* token_vector;
+        int token_vector_count;
+        int index;
+        void* private;
+        
+    };
+    typedef struct token* (*NEXT_TOKEN)(struct parse_process* parser);
+    typedef bool (*MATCH)(struct parse_process* parser, int type, const char* value);
+    typedef bool (*CONSUME)(struct parse_process* parser, int type, const char* value);
+    struct token* parse_process_next_token(struct parse_process* parser);
+    bool parse_process_match(struct parse_process* parser, int type, const char* value);
+    bool parse_process_consume(struct parse_process* parser, int type, const char* value);
+
+    struct parse_process_functions
+    {
+        NEXT_TOKEN next_token;
+        MATCH match;
+        CONSUME consume;  
     };
 
     int compile_file(const char* filename, const char* out_filename, int flags);
@@ -135,6 +163,13 @@
     void compiler_error(struct compile_process* compiler, const char* msg, ...);
     void compiler_warning(struct compile_process* compiler, const char* msg, ...);
     bool is_token_keyword(struct token* token, char* keyword);
+    struct parse_process* create_parse_process(struct compile_process* compiler,struct parse_process_functions* functions, void* private );
+    void parser_process_free(struct parse_process* parser);
+    void* parser_process_private(struct parse_process* parser);
 
 
-    #endif // COMPILER_H
+
+
+
+
+#endif /* COMPILER_H */
