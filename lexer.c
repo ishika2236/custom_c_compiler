@@ -81,7 +81,7 @@ struct token* token_create_string(char start_delim, char end_delim)
     token -> sval = buffer_ptr(buffer);
     token -> type = TOKEN_TYPE_STRING;
     token->pos = lex_process->pos;
-    printf("%s\n", token->sval);
+    // printf("%s\n", token->sval);
     return token;
 }
 
@@ -127,7 +127,7 @@ struct token* token_create_number( unsigned long long number)
     {
         tmptoken.between_brackets = buffer_ptr(lex_process -> parentheses_buffer);
     }
-    printf("%lld\n", token->llnum);
+    // printf("%lld\n", token->llnum);
     return token;
 }
 static bool op_treated_as_one(char op)
@@ -244,7 +244,7 @@ char* read_op()
     bool single_operator = true;
 
     char op = nextc();
-    printf("%c\n", op);
+    // printf("%c\n", op);
     struct buffer* buffer = buffer_create();
     buffer_write(buffer, op);
 
@@ -314,7 +314,7 @@ struct token* token_create_one_line_comment()
     token->sval = (char*) buffer_ptr(buffer); 
     token->type = TOKEN_TYPE_COMMENT;
     token->pos = lex_process->pos;
-    printf("# %s\n", token->sval); 
+    // printf("# %s\n", token->sval); 
 
     return token;
 }
@@ -353,7 +353,7 @@ struct token* token_create_multiline_comment()
     token->sval = (char*) buffer_ptr(buffer);   
     token->type = TOKEN_TYPE_COMMENT;
     token->pos = lex_process->pos;
-    printf("/* %s */\n", token->sval); 
+    // printf("/* %s */\n", token->sval); 
 
     return token;
 }
@@ -433,7 +433,7 @@ struct token* make_symbol_token()
     token -> cval = c;
     token -> pos = lex_process -> pos;
     token -> type = TOKEN_TYPE_SYMBOL;
-    printf("%c\n",c);
+    // printf("%c\n",c);
 
     return token;
 }
@@ -456,7 +456,7 @@ struct token* make_token_identifer_or_keyword()
     struct token* token = (struct token*) malloc(sizeof(struct token));
     token -> sval = ptr;
     token -> pos = lex_process -> pos;
-    printf("%s\n", ptr);
+    // printf("%s\n", ptr);
 
     if( is_keyword(ptr))
     { 
@@ -538,7 +538,7 @@ struct token* token_make_quote() {
     token->type = TOKEN_TYPE_STRING;
     token->pos = lex_process->pos;
 
-    printf("Char token created: %s\n", token->sval); // Debug code
+    // printf("Char token created: %s\n", token->sval); // Debug code
 
     return token;
 }
@@ -589,7 +589,7 @@ struct token* read_next_token()
 
         case '\n':
             token = token_make_newline();
-            printf("-----------------------------------------------------------\n");
+            // printf("-----------------------------------------------------------\n");
             break;
         
         default:
@@ -621,6 +621,9 @@ int lex(struct lex_process* process)
         
     }
     printf("Total count of tokens: %i\n",lex_process->compiler->token_vector_count);
+    printf("Total count of tokens: %i\n",vector_count(lex_process -> token_vec));
+
+
     
     return LEXICAL_ANALYSIS_ALL_OK;
 
