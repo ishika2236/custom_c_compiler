@@ -3,37 +3,42 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include "./helpers/vector.h"
+#include <string.h>
 
-
-struct ast_node* create_ast_node(enum ast_node_type type)
-{
-    struct ast_node* node = (struct ast_node*) malloc(sizeof(struct ast_node));
-    node -> type = type;
-    node-> value = NULL;
-    node -> child_count = 0;
-    node -> child_capacity = 2; //initial capacity for child node
-    node -> children = (struct ast_node**) malloc(sizeof(struct ast_node) * node -> child_capacity);
-
+struct ast_node* create_ast_node(enum ast_node_type type) {
+    struct ast_node* node = (struct ast_node*)malloc(sizeof(struct ast_node));
+    node->type = type;
+    node->value = NULL; 
+    node->children = NULL;
+    node->child_count = 0;
+    node->child_capacity = 0;
     return node;
 }
-struct ast_node* create_ast_node_with_value(enum ast_node_type type, const char* value)
-{
-    struct ast_node* node = (struct ast_node*) malloc(sizeof(struct ast_node));
-    node -> value = strdup(value);
+struct ast_node* create_ast_node_with_value(enum ast_node_type type, const char* value) {
+    struct ast_node* node = (struct ast_node*)malloc(sizeof(struct ast_node));
+    if (node == NULL) {
+        perror("Failed to allocate memory for AST node");
+        exit(EXIT_FAILURE);
+    }
+    node->type = type;
+    node->value = strdup(value);
+    if (node->value == NULL) {
+        perror("Failed to allocate memory for AST node value");
+        exit(EXIT_FAILURE);
+    }
+    node->children = NULL;
+    node->child_count = 0;
+    node->child_capacity = 0;
     return node;
 }
 
-void add_child(struct ast_node* parent, struct ast_node* child)
-{
-    if(parent -> child_count >= parent -> child_capacity)
-    {
-        parent -> child_capacity *= 2;
-        parent -> children  = (struct ast_node ** )realloc(parent->children, sizeof(struct ast_node*) * parent->child_capacity);
-
+void add_child(struct ast_node* parent, struct ast_node* child) {
+    if (parent->child_count >= parent->child_capacity) {
+        parent->child_capacity = parent->child_capacity == 0 ? 2 : parent->child_capacity * 2;
+        parent->children = realloc(parent->children, parent->child_capacity * sizeof(struct ast_node*));
     }
     parent->children[parent->child_count++] = child;
 }
-
 void free_ast_node(struct ast_node* node)
 {
     if(node -> value)

@@ -1,6 +1,5 @@
-int main()
+int main( int q, int r)
 {
-    for(int i = 0 ; i < 10; i++){
-        printf(i);
-    }
+    int a ;
+    return 0;
 }

@@ -33,6 +33,25 @@ static void pushc(char c){
     lex_process->functions -> push_char(lex_process, c);
 
 }
+// Function to print token details (can be customized based on token structure)
+// void print_token(struct token *tkn) {
+//     printf("Token Type: %d\n", tkn->type);
+//     printf("Token Value: %s\n", tkn->sval);
+//     printf("Token Position: Line %d, Column %d\n", tkn->pos.line, tkn->pos.col);
+//     printf("-----------------------------------\n");
+// }
+
+// // Function to print all tokens in the vector
+// void token_vector_print(struct vector *token_vector) {
+//     int count = vector_count(token_vector);
+//     for (int i = 0; i < count; i++) {
+//         struct token *tkn = (struct token *)vector_at(token_vector, i);
+//         print_token(tkn);
+//     }
+// }
+// void lexer_finalize() {
+//     token_vector_print(lex_process->token_vec);
+// }
 
 static char assert_next_char(char c)
 {
@@ -87,7 +106,7 @@ struct token* token_create_string(char start_delim, char end_delim)
 
 static struct token*  lexer_last_token()
 {
-    return vector_back_or_null(lex_process -> token_vec);
+    return vector_get(lex_process -> token_vec, lex_process->token_vec->total -1);
 }
 
 static struct token* handle_whitespace()
@@ -125,14 +144,19 @@ struct token* token_create_number( unsigned long long number)
     token -> pos = lex_process->pos;
     if(lex_process -> current_expression_count>0)
     {
+        if (lex_process->parentheses_buffer == NULL) {
+            fprintf(stderr, "Parentheses buffer is NULL\n");
+            exit(1);
+        }
         tmptoken.between_brackets = buffer_ptr(lex_process -> parentheses_buffer);
     }
     // printf("%lld\n", token->llnum);
-    return token;
+    return token;   
 }
 static bool op_treated_as_one(char op)
 {
-    return op == '(' || op == '[' || op == ',' || op == '.' || op == '*' || op == '?';
+    
+    return   op == ',' || op == '.' || op == '*' || op == '?';
 }
 static bool is_single_character(char op)
 {
@@ -142,7 +166,6 @@ static bool is_single_character(char op)
            op == '*' ||
            op == '&' ||
            op == '|' ||
-           op == '(' ||
            op == '%' ||
            op == '~' ||
            op == '!' ||
@@ -182,8 +205,6 @@ bool op_valid(char* ptr){
            strcmp(ptr, "*") == 0 ||
            strcmp(ptr, "/") == 0 ||
            strcmp(ptr, "%") == 0 ||
-           strcmp(ptr, "(") == 0 ||
-           strcmp(ptr, "[") == 0 ||
            strcmp(ptr, "=") == 0;
            
 
@@ -242,48 +263,31 @@ static void flush_back(struct buffer* buffer){
 char* read_op()
 {
     bool single_operator = true;
-
     char op = nextc();
-    // printf("%c\n", op);
     struct buffer* buffer = buffer_create();
     buffer_write(buffer, op);
 
-    if(!op_treated_as_one(op)){
-        op =  peekc();
-
-        if(is_single_character(op)){
-            buffer_write(buffer, op);
-            nextc();
-            single_operator = false;
-        }
-    }
-    else{
+    if (op_treated_as_one(op)) {
+        // No additional characters for treated operators
+    } else if (is_single_character(peekc())) {
+        op = nextc();
         buffer_write(buffer, op);
-        // nextc();
-        if(op =='('){
-            lex_new_expression();
-        }
+        single_operator = false;
     }
 
     buffer_write(buffer, 0x00);
     char* ptr = (char*) buffer_ptr(buffer);
 
-    if(!single_operator)
-    {
-        if(!op_valid(ptr))
-        {
-            flush_back(buffer);
-            ptr[1] = 0x00;
-        }
+    if (single_operator && !op_valid(ptr)) {
+        compiler_error(lex_process->compiler, "The operator %s isn't valid", ptr);
+    } else if (!single_operator && !op_valid(ptr)) {
+        flush_back(buffer);
+        ptr[1] = 0x00;
     }
-    else if(!op_valid(ptr))
-    {
-        compiler_error(lex_process->compiler, "The operator %s isn't valid ", ptr);
-    }
-    
-    // printf("%s\n", ptr); // debug statement
+
     return ptr;
 }
+
 struct token* token_make_newline()
 {
     struct token* token = (struct token*) malloc(sizeof(struct token));
@@ -379,11 +383,7 @@ struct token* token_create_string_or_operator()
     {
         tmptoken.between_brackets = buffer_ptr(lex_process -> parentheses_buffer);
     }
-    if(op == '(')
-    {
-        // printf("%c\n",op);
-        lex_new_expression();
-    }
+    
     
     return token;
 }
@@ -419,6 +419,8 @@ static void handle_closing_expression()
 struct token* make_symbol_token()
 {
     char c = nextc();
+    // char next = nextc();
+    // printf("in make symbol c is :%c \n", c);
 
     if(c == ')')
     {
@@ -445,7 +447,10 @@ struct token* make_token_identifer_or_keyword()
     for (;( c >= 'a' && c <= 'z') || (c>='A' && c<= 'Z') || (c >='0' && c<='9') || c =='_'; c=nextc())
     {
         buffer_write(buffer,c);
+        // nextc();
     }
+    pushc(c);
+
 
     buffer_write(buffer, 0x00);
     char* ptr = (char*) buffer_ptr(buffer);
@@ -460,6 +465,7 @@ struct token* make_token_identifer_or_keyword()
 
     if( is_keyword(ptr))
     { 
+        
         token -> type = TOKEN_TYPE_KEYWORD;
     }
     else token -> type = TOKEN_TYPE_IDENTIFIER;
@@ -548,8 +554,11 @@ struct token* token_make_quote() {
 struct token* read_next_token()
 {
     struct  token* token = NULL;
+  
     // printf("Reading next token at line %d, col %d\n", lex_process->pos.line, lex_process->pos.col); // debug statement
     char c = peekc();
+    // printf("Reading next token at line %d, col %d, peeked char: %c\n", lex_process->pos.line, lex_process->pos.col, c);
+    // printf("peeking c value %c\n", c);
     token = handle_comment();
     if(token)
     {
@@ -561,16 +570,29 @@ struct token* read_next_token()
             token = token_create_number(read_number());
             break;
 
+        // case '(':
+        //     token =  (struct token*) malloc(sizeof(struct token));
+        //     token -> cval  = c;
+        //     token -> type = TOKEN_TYPE_SYMBOL;
+        //     // token = make_symbol_token();
+        //     lex_new_expression();
+        //     printf("%c\n", token->cval);
+        //     break;
+
         OPERATOR_EXCLUDING_DIVISION:
             token = token_create_string_or_operator();
+            // printf("operator encountered: %s\n", token->sval);
             break;
 
         case '"':
             token = token_create_string('"','"');
             break;
+        
+
 
         SYMBOL_CASE:
             token = make_symbol_token();
+            // printf("%c\n", token->cval);
             break;
 
         case EOF:
@@ -601,7 +623,7 @@ struct token* read_next_token()
             
             break;
     }
-     lex_process -> compiler -> token_vector_count ++;
+    //  lex_process -> compiler -> token_vector_count ++;
    
     return token;
 }
@@ -616,12 +638,14 @@ int lex(struct lex_process* process)
     struct token* token = read_next_token();
     while(token)
     {
-        vector_push(process -> token_vec, token);
+        vector_add(process -> token_vec, token);
         token = read_next_token();
         
     }
+    lex_process->compiler->token_vector_count = vector_total(lex_process -> token_vec);
     printf("Total count of tokens: %i\n",lex_process->compiler->token_vector_count);
-    printf("Total count of tokens: %i\n",vector_count(lex_process -> token_vec));
+    printf("Total count of tokens: %i\n",vector_total(lex_process -> token_vec));
+    // lexer_finalize();
 
 
     
