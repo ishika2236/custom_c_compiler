@@ -7,7 +7,5 @@ int main() {
     if(x  == 5){
         print(10);
     }
-    else {
-        print(20);
-    }
+    
 }

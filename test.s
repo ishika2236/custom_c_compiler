@@ -17,7 +17,8 @@ main:
 	pushq %rax
 	movq $20, %rax
 	popq %rcx
-	addq %rcx, %rax
+	subq %rax, %rcx
+	movq %rcx, %rax
 	movq %rax, -24(%rbp)
 	movq -24(%rbp), %rax
 	# Convert integer to string and print
