@@ -316,17 +316,18 @@ struct ast_node* parse_return_statement(struct parse_process* parser) {
 
 struct ast_node* parse_while_statement(struct parse_process* parser) {
     printf("Parsing while statement...\n");
-    struct token* while_token = consume_token(parser);
-    
-    if (!check_and_consume(parser, TOKEN_TYPE_SYMBOL, "(")) {
+    struct token* while_token = vector_get(parser->token_vector, parser->index);
+    parser->index++;
+    struct token* token = vector_get(parser->token_vector, parser->index);
+    if (token -> type != TOKEN_TYPE_SYMBOL || token->cval != '(') {
         compiler_error(parser->compiler, "Expected opening parenthesis");
         printf("Error: Expected opening parenthesis in while statement\n");
         return NULL;
     }
-    
+    parser->index ++;
     struct ast_node* condition = parse_expression(parser);
-    
-    if (!check_and_consume(parser, TOKEN_TYPE_SYMBOL, ")")) {
+    token = vector_get(parser->token_vector, parser->index);
+    if (token -> type != TOKEN_TYPE_SYMBOL || token->cval != ')') {
         compiler_error(parser->compiler, "Expected closing parenthesis");
         printf("Error: Expected closing parenthesis in while statement\n");
         free_ast_node(condition);

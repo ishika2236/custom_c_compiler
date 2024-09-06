@@ -4,8 +4,10 @@ int main() {
     int z = 10 + 20;
     print(z);
     print(x);
-    if(x == 5){
+    if(x  == 5){
         print(10);
     }
-    return 0;
+    else {
+        print(20);
+    }
 }

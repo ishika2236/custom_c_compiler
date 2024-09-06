@@ -70,22 +70,80 @@ void generate_expression(FILE* output, struct ast_node* node) {
     switch (node->type) {
         case AST_BINARY_OP:
             generate_expression(output, node->binary_op.left);
-            fprintf(output, "\tpushq %%rax\n");  // Push left operand result onto the stack
+            fprintf(output, "\tpushq %%rax\n");
             generate_expression(output, node->binary_op.right);
-            fprintf(output, "\tpopq %%rcx\n");   // Pop left operand result from the stack into rcx
+            fprintf(output, "\tpopq %%rcx\n");
 
             if (strcmp(node->binary_op.operator, "+") == 0) {
-                fprintf(output, "\taddq %%rcx, %%rax\n");  // rax = rcx + rax
+                fprintf(output, "\taddq %%rcx, %%rax\n");
             } else if (strcmp(node->binary_op.operator, "-") == 0) {
                 fprintf(output, "\tsubq %%rax, %%rcx\n");
-                fprintf(output, "\tmovq %%rcx, %%rax\n");  // rax = rcx - rax
+                fprintf(output, "\tmovq %%rcx, %%rax\n");
             } else if (strcmp(node->binary_op.operator, "*") == 0) {
-                fprintf(output, "\timulq %%rcx, %%rax\n"); // rax = rcx * rax
+                fprintf(output, "\timulq %%rcx, %%rax\n");
             } else if (strcmp(node->binary_op.operator, "/") == 0) {
-                fprintf(output, "\tcqo\n");               // Sign-extend rax into rdx
-                fprintf(output, "\tidivq %%rcx\n");       // rax = rdx:rax / rcx
+                fprintf(output, "\tcqo\n");
+                fprintf(output, "\tidivq %%rcx\n");
+            } else if (strcmp(node->binary_op.operator, ">") == 0) {
+                fprintf(output, "\tcmpq %%rax, %%rcx\n");
+                fprintf(output, "\tsetg %%al\n");
+                fprintf(output, "\tmovzbq %%al, %%rax\n");
+            } else if (strcmp(node->binary_op.operator, "<") == 0) {
+                fprintf(output, "\tcmpq %%rax, %%rcx\n");
+                fprintf(output, "\tsetl %%al\n");
+                fprintf(output, "\tmovzbq %%al, %%rax\n");
+            } else if (strcmp(node->binary_op.operator, ">=") == 0) {
+                fprintf(output, "\tcmpq %%rax, %%rcx\n");
+                fprintf(output, "\tsetge %%al\n");
+                fprintf(output, "\tmovzbq %%al, %%rax\n");
+            } else if (strcmp(node->binary_op.operator, "<=") == 0) {
+                fprintf(output, "\tcmpq %%rax, %%rcx\n");
+                fprintf(output, "\tsetle %%al\n");
+                fprintf(output, "\tmovzbq %%al, %%rax\n");
+            } else if (strcmp(node->binary_op.operator, "==") == 0) {
+                fprintf(output, "\tcmpq %%rax, %%rcx\n");
+                fprintf(output, "\tsete %%al\n");
+                fprintf(output, "\tmovzbq %%al, %%rax\n");
+            } else if (strcmp(node->binary_op.operator, "!=") == 0) {
+                fprintf(output, "\tcmpq %%rax, %%rcx\n");
+                fprintf(output, "\tsetne %%al\n");
+                fprintf(output, "\tmovzbq %%al, %%rax\n");
+            } else if (strcmp(node->binary_op.operator, "+=") == 0 ||
+                       strcmp(node->binary_op.operator, "-=") == 0 ||
+                       strcmp(node->binary_op.operator, "*=") == 0 ||
+                       strcmp(node->binary_op.operator, "/=") == 0) {
+                // Compound assignment operators
+                char op = node->binary_op.operator[0];
+                int offset = get_variable_offset(node->binary_op.left->id_literal.value);
+                fprintf(output, "\tmovq -%d(%%rbp), %%rcx\n", offset);
+                switch (op) {
+                    case '+': fprintf(output, "\taddq %%rax, %%rcx\n"); break;
+                    case '-': fprintf(output, "\tsubq %%rax, %%rcx\n"); break;
+                    case '*': fprintf(output, "\timulq %%rax, %%rcx\n"); break;
+                    case '/': 
+                        fprintf(output, "\txchgq %%rax, %%rcx\n");
+                        fprintf(output, "\tcqo\n");
+                        fprintf(output, "\tidivq %%rcx\n");
+                        fprintf(output, "\tmovq %%rax, %%rcx\n");
+                        break;
+                }
+                fprintf(output, "\tmovq %%rcx, -%d(%%rbp)\n", offset);
+                fprintf(output, "\tmovq %%rcx, %%rax\n");
             }
-            // Add more operators as needed
+            break;
+
+        case AST_UNARY_OP:
+            if (strcmp(node->unary_op.operator, "++") == 0 ||
+                strcmp(node->unary_op.operator, "--") == 0) {
+                int offset = get_variable_offset(node->unary_op.operand->id_literal.value);
+                fprintf(output, "\tmovq -%d(%%rbp), %%rax\n", offset);
+                if (strcmp(node->unary_op.operator, "++") == 0) {
+                    fprintf(output, "\tincq %%rax\n");
+                } else {
+                    fprintf(output, "\tdecq %%rax\n");
+                }
+                fprintf(output, "\tmovq %%rax, -%d(%%rbp)\n", offset);
+            }
             break;
 
         case AST_IDENTIFIER:
@@ -197,17 +255,22 @@ void generate_code(FILE* output, struct ast_node* root) {
             stack_offset += get_type_size(root->declaration.type);
             break;
         case AST_BINARY_OP:
-        if (strcmp(root->binary_op.operator, "=") == 0) {
-            struct ast_node* lhs = root->binary_op.left;
-            struct ast_node* rhs = root->binary_op.right;
-            generate_expression(output, rhs);  // Compute right-hand side and store in rax
-            if (lhs->type == AST_IDENTIFIER) {
-                fprintf(output, "\tmovq %%rax, -%d(%%rbp)\n", get_variable_offset(lhs->id_literal.value));
+            if (strcmp(root->binary_op.operator, "=") == 0) {
+                struct ast_node* lhs = root->binary_op.left;
+                struct ast_node* rhs = root->binary_op.right;
+                generate_expression(output, rhs);  // Compute right-hand side and store in rax
+                if (lhs->type == AST_IDENTIFIER) {
+                    fprintf(output, "\tmovq %%rax, -%d(%%rbp)\n", get_variable_offset(lhs->id_literal.value));
+                }
+            } if (strcmp(root->binary_op.operator, "==") == 0) {
+                fprintf(output, "\tcmpq %%rax, %%rcx\n");
+                fprintf(output, "\tsete %%al\n");
+                fprintf(output, "\tmovzbq %%al, %%rax\n");
             }
-        } else {
-            generate_expression(output, root);
-        }
-    break;
+            else {
+                generate_expression(output, root);
+            }
+            break;
 
         case AST_PRINT:
             
@@ -229,6 +292,74 @@ void generate_code(FILE* output, struct ast_node* root) {
                 generate_code(output, root->root.statements[i]);
             }
             fprintf(output, "\t.section .note.GNU-stack,\"\",@progbits\n");
-        // Add more cases as needed
+            break;
+        case AST_IF_STMT:
+                
+                char* else_label = generate_label();
+                char* end_if_label = generate_label();
+
+                // Generate code for the condition
+                generate_expression(output, root->if_stmt.condition);
+                
+                // Compare the result with 0
+                fprintf(output, "\tcmpq $0, %%rax\n");
+                fprintf(output, "\tje %s\n", else_label);
+
+                // Generate code for the then branch
+                generate_code(output, root->if_stmt.true_body);
+                fprintf(output, "\tjmp %s\n", end_if_label);
+               
+                // Else branch (if it exists)
+                fprintf(output, "%s:\n", else_label);
+                if (root->if_stmt.false_body) {
+                    generate_code(output, root->if_stmt.false_body);
+                }
+
+                // End of if statement
+                fprintf(output, "%s:\n", end_if_label);
+                
+                free(else_label);
+                free(end_if_label);
+            
+            break;
+        case AST_WHILE:
+            {
+                char* start_label = generate_label();
+                char* end_label = generate_label();
+
+                // Start of while loop
+                fprintf(output, "%s:\n", start_label);
+
+                // Generate code for the condition
+                generate_expression(output, root->while_loop.condition);
+
+                // Compare the result with 0
+                fprintf(output, "\tcmpq $0, %%rax\n");
+                fprintf(output, "\tje %s\n", end_label);
+
+                // Generate code for the loop body
+                generate_code(output, root->while_loop.body);
+
+                // Jump back to the start of the loop
+                fprintf(output, "\tjmp %s\n", start_label);
+
+                // End of while loop
+                fprintf(output, "%s:\n", end_label);
+
+                free(start_label);
+                free(end_label);
+            }
+            break;
+        case AST_RETURN:
+            // Generate code for the return expression (if any)
+            if (root->return_stmt.value) {
+                generate_expression(output, root->return_stmt.value);
+            }
+
+            // Function epilogue
+            fprintf(output, "\tmovq %%rbp, %%rsp\n");
+            fprintf(output, "\tpopq %%rbp\n");
+            fprintf(output, "\tret\n");
+            break;
     }
 }

@@ -71,6 +71,7 @@ int compile_file(const char* filename, const char* out_filename, int flags)
     {
         return PARSER_FAILED_WITH_ERRORS;
     }
+    printf("parserd successfully\n");
     print_ast(parse_process -> root);
     // FILE* asm_output = fopen("output.s", "w");
     // if (!asm_output) {
