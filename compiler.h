@@ -145,6 +145,7 @@
         int token_vector_count;
         int index;
         void* private;
+        struct ast_node* root; 
         
     };
 enum ast_node_type {
@@ -179,7 +180,8 @@ enum ast_node_type {
     AST_WHILE_LOOP,
     AST_LITERAL,
     AST_PREPROCESSOR,
-    AST_ROOT
+    AST_ROOT,
+    AST_PRINT
 };
 struct ast_node {
     enum ast_node_type type;
@@ -221,6 +223,7 @@ struct ast_node {
             char* name;
             struct ast_node* initial_value;
         } declaration;
+      
         
         // For if statements
         struct {
@@ -260,6 +263,9 @@ struct ast_node {
         struct {
             struct ast_node* value;
         }return_stmt;
+        struct {
+            struct ast_node* expression;
+        } print;
         
        
     };
@@ -277,6 +283,8 @@ struct ast_node* create_if_stmt_node(struct pos pos, struct ast_node* condition,
 struct ast_node* create_while_loop_node(struct pos pos, struct ast_node* condition, struct ast_node* body);
 struct ast_node* create_for_node(struct pos pos, struct ast_node* init, struct ast_node* condition, struct ast_node* update, struct ast_node* body);
 struct ast_node* create_block_node(struct pos pos);
+struct ast_node* create_function_definition_node(struct pos pos, const char* return_type, const char* name, struct ast_node** parameters, int param_count, struct ast_node* body);
+struct ast_node* create_print_node(struct pos pos, struct ast_node* expression) ;
 
 struct ast_node* create_ast_node_with_value(enum ast_node_type type, const char* value, struct pos pos);
 
@@ -286,7 +294,7 @@ void add_child(struct ast_node* parent, struct ast_node* child);
     typedef struct token* (*PEEK_TOKEN)(struct parse_process* parser);
 
     struct token* get_next_token(struct parse_process* parser);
-
+    struct token* get_curr_token(struct parse_process* parser);
     struct token* peek_next_token(struct parse_process* parser);
 
 
@@ -309,13 +317,14 @@ void add_child(struct ast_node* parent, struct ast_node* child);
     void compiler_warning(struct compile_process* compiler, const char* msg, ...);
     bool is_token_keyword(struct token* token, char* keyword);
     struct ast_node* parse_expression(struct parse_process* parser);
-struct ast_node* parse_statement(struct parse_process* parser);
-struct ast_node* parse_declaration(struct parse_process* parser);
-struct ast_node* parse_function_definition(struct parse_process* parser);
-void parse_process_expect(struct parse_process* parser, int token_type, const char* value);
-int parse_process_match(struct parse_process* parser, int token_type, const char* value);
-void free_ast_node(struct ast_node* node);
-struct ast_node* parse(struct parse_process* parser);
+    struct ast_node* parse_statement(struct parse_process* parser);
+    struct ast_node* parse_declaration(struct parse_process* parser);
+    struct ast_node* parse_function_definition(struct parse_process* parser);
+    void parse_process_expect(struct parse_process* parser, int token_type, const char* value);
+    int parse_process_match(struct parse_process* parser, int token_type, const char* value);
+    void free_ast_node(struct ast_node* node);
+    struct ast_node* parse(struct parse_process* parser);
+   void print_ast(struct ast_node* root);
 
     // struct ast_node* create_ast_node(enum ast_node_type type);
     // struct ast_node* create_ast_node_with_value(enum ast_node_type type, const char* value);
@@ -326,21 +335,15 @@ struct ast_node* parse(struct parse_process* parser);
     void parser_process_free(struct parse_process* parser);
     void* parser_process_private(struct parse_process* parser);
     struct ast_node* parse_program(struct parse_process* process);
-    // struct ast_node* parse_declaration(struct parse_process* process);
-    // struct ast_node* parse_conditional(struct parse_process* process);
-    // struct ast_node* parse_loop(struct parse_process* process);
-    // struct ast_node* parse_return(struct parse_process* process);
-    // struct ast_node* parse_expression(struct parse_process* process);
-    // struct ast_node* parse_block(struct parse_process* process);
-    // struct ast_node* parse_statement(struct parse_process* process);
-    // void syntax_error(const char* message, struct token* token);
+    struct ast_node* parse_print_statement(struct parse_process* parser);
+    void generate_code(FILE* output, struct ast_node* root);
+    // Helper functions
+    int count_local_variables(struct ast_node* node);
+    int get_variable_offset(const char* name);
 
-    // struct token* get_next_token(struct parse_process* parser);
-    // struct token* peek_next_token(struct parse_process* parser);
-    // bool parse_process_match(struct parse_process* parser, int type, const char* value);
-    // bool parse_process_consume(struct parse_process* parser, int type, const char* value);
-
-
-
+    // Internal functions (you may choose to keep these private)
+    void generate_expression(FILE* output, struct ast_node* node);
+    void generate_statement(FILE* output, struct ast_node* node);
+    void generate_function(FILE* output, struct ast_node* node);
 
 #endif /* COMPILER_H */

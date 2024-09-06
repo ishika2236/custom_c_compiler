@@ -1,5 +1,5 @@
-int main( int q, int r)
+int main()
 {
-    int a = 10;
-    return 0;
+    int a  = 10;
+    int b = 20;
 }

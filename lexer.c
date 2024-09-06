@@ -156,7 +156,7 @@ struct token* token_create_number( unsigned long long number)
 static bool op_treated_as_one(char op)
 {
     
-    return   op == ',' || op == '.' || op == '*' || op == '?';
+    return   op == ',' || op == '.'  || op == '?';
 }
 static bool is_single_character(char op)
 {
@@ -236,7 +236,8 @@ bool is_keyword(const char* keyword)
            strcmp("case", keyword) == 0 ||
            strcmp("default", keyword) == 0 ||
            strcmp("typedef", keyword) == 0 ||
-           strcmp("const", keyword) == 0 ;
+           strcmp("const", keyword) == 0 ||
+           strcmp("print", keyword) == 0;
            
 }
 static void lex_new_expression()
@@ -446,6 +447,10 @@ struct token* make_token_identifer_or_keyword()
 
     for (;( c >= 'a' && c <= 'z') || (c>='A' && c<= 'Z') || (c >='0' && c<='9') || c =='_'; c=nextc())
     {
+        
+        if (c == '(' || c == ')') {
+            break;  // Stop if we encounter a parenthesis
+        }
         buffer_write(buffer,c);
         // nextc();
     }
@@ -461,7 +466,7 @@ struct token* make_token_identifer_or_keyword()
     struct token* token = (struct token*) malloc(sizeof(struct token));
     token -> sval = ptr;
     token -> pos = lex_process -> pos;
-    // printf("%s\n", ptr);
+    printf("%s\n", ptr);
 
     if( is_keyword(ptr))
     { 
@@ -615,12 +620,15 @@ struct token* read_next_token()
             break;
         
         default:
-            token = read_special_token();
-            if(!token)
-            {
-                compiler_error(lex_process->compiler, "Unexpected Token");
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
+                token = make_token_identifer_or_keyword();
+            } else {
+                token = read_special_token();
+                if(!token)
+                {
+                    compiler_error(lex_process->compiler, "Unexpected Token");
+                }
             }
-            
             break;
     }
     //  lex_process -> compiler -> token_vector_count ++;
@@ -638,7 +646,11 @@ int lex(struct lex_process* process)
     struct token* token = read_next_token();
     while(token)
     {
-        vector_add(process -> token_vec, token);
+        if(token -> type != TOKEN_TYPE_NEWLINE)
+        {
+            vector_add(process -> token_vec, token);
+        }
+        
         token = read_next_token();
         
     }

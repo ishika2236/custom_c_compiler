@@ -55,6 +55,15 @@ void compile_process_push_char(struct lex_process* lex_process, char c) {
     ungetc(c, compiler->cfile.fp);  
 }
 
+struct token* get_curr_token(struct parse_process* parser)
+{
+   
+     if (parser->index < parser->token_vector_count) {
+        return vector_get(parser->token_vector, parser->index-1);
+    }
+    return NULL;
+}
+
 // bool parse_process_match(struct parse_process* parser, int type, const char* value) {
 //     struct token* current_token = vector_get(parser->token_vector, parser->index);
 //     if (current_token->type == type && strcmp(current_token->sval, value) == 0) {
