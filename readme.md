@@ -1,6 +1,3 @@
-Here’s the content converted into Markdown:
-
-```markdown
 # Main Language Interpreter
 
 This project is a simple interpreter for a custom language called **"Main Language."** The interpreter consists of a **Lexer**, **Parser**, and **Abstract Syntax Tree (AST)** visitor to execute the interpreted code.
@@ -49,7 +46,6 @@ The Main Language Interpreter allows you to write code in a basic, custom langua
 ```bash
 git clone https://github.com/your-username/main-language-interpreter.git
 cd main-language-interpreter
-```
 
 ### Build the Project
 
