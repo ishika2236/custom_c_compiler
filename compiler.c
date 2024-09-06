@@ -78,10 +78,10 @@ int compile_file(const char* filename, const char* out_filename, int flags)
     //     return COMPILER_FAILED_WITH_ERRORS;
     // }
   
-    // generate_code(asm_output, parse_process->root);
+    generate_code(process->ofile, parse_process->root);
 
-    // fclose(asm_output);
-    // printf("Code generation completed. Assembly written to output.s\n");
+    fclose(process->ofile);
+    printf("Code generation completed. Assembly written to test.s\n");
 
     return COMPILER_FILE_COMPILED_OK;
 

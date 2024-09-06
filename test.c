@@ -1,5 +1,5 @@
-int main()
-{
-    int a  = 10;
-    int b = 20;
+int main() {
+    int x = 5;
+    print(5);
+    return 0;
 }

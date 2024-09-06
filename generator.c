@@ -1,233 +1,223 @@
+
 #include "compiler.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-int count_local_variables(struct ast_node* node) ;
-int get_variable_offset(const char* name);
 
-// Function to generate unique labels
-static int label_count = 0;
-char* generate_label() {
+// Helper function to generate unique labels
+static int label_counter = 0;
+static char* generate_label() {
     char* label = malloc(20);
-    sprintf(label, "L%d", label_count++);
+    sprintf(label, "L%d", label_counter++);
     return label;
 }
 
-// Function prototypes
-void generate_expression(FILE* output, struct ast_node* node);
-void generate_statement(FILE* output, struct ast_node* node);
-
-// Generate code for binary operations
-void generate_binary_op(FILE* output, struct ast_node* node) {
-    generate_expression(output, node->binary_op.left);
-    fprintf(output, "    push %%rax\n");
-    generate_expression(output, node->binary_op.right);
-    fprintf(output, "    pop %%rcx\n");
-
-    if (strcmp(node->binary_op.operator, "+") == 0) {
-        fprintf(output, "    addq %%rcx, %%rax\n");
-    } else if (strcmp(node->binary_op.operator, "-") == 0) {
-        fprintf(output, "    subq %%rax, %%rcx\n");
-        fprintf(output, "    movq %%rcx, %%rax\n");
-    } else if (strcmp(node->binary_op.operator, "*") == 0) {
-        fprintf(output, "    imulq %%rcx\n");
-    } else if (strcmp(node->binary_op.operator, "/") == 0) {
-        fprintf(output, "    xchgq %%rax, %%rcx\n");
-        fprintf(output, "    cqto\n");
-        fprintf(output, "    idivq %%rcx\n");
-    }
-    // Add more operations as needed
+// Helper function to get the size of a type
+static int get_type_size(const char* type) {
+    if (strcmp(type, "int") == 0) return 8;  // 64-bit integers
+    if (strcmp(type, "char") == 0) return 1;
+    // Add more types as needed
+    return 8;  // Default to 8 bytes for 64-bit architecture
 }
 
-// Generate code for expressions
+void generate_function_prologue(FILE* output, const char* function_name) {
+    fprintf(output, "\t.text\n");
+    fprintf(output, "\t.globl %s\n", function_name);
+    fprintf(output, "\t.type %s, @function\n", function_name);
+    fprintf(output, "%s:\n", function_name);
+    fprintf(output, "\tpushq %%rbp\n");
+    fprintf(output, "\tmovq %%rsp, %%rbp\n");
+}
+
+void generate_function_epilogue(FILE* output) {
+    fprintf(output, "\tmovq %%rbp, %%rsp\n");
+    fprintf(output, "\tpopq %%rbp\n");
+    fprintf(output, "\tret\n");
+}
+
+void generate_variable_assignment(FILE* output, const char* var_name, int offset, const char* value) {
+    fprintf(output, "\tmovq $%s, -%d(%%rbp)\n", value, offset);
+}
+void generate_print_variable(FILE* output, const char* var_name, int offset) {
+    fprintf(output, "\tmovq -%d(%%rbp), %%rdi\n", offset);
+    fprintf(output, "\tcall print_int\n");
+}
 void generate_expression(FILE* output, struct ast_node* node) {
+    if (!node) return;
+
     switch (node->type) {
-        case AST_NUMBER:
-            fprintf(output, "    movq $%s, %%rax\n", node->id_literal.value);
-            break;
-        case AST_IDENTIFIER:
-            // Assume variables are stored on the stack
-            fprintf(output, "    movq -%d(%%rbp), %%rax\n", 8 * get_variable_offset(node->id_literal.value));
-            break;
         case AST_BINARY_OP:
-            generate_binary_op(output, node);
+            generate_expression(output, node->binary_op.left);
+            fprintf(output, "\tpushq %%rax\n");  // Push left operand result onto the stack
+            generate_expression(output, node->binary_op.right);
+            fprintf(output, "\tpopq %%rcx\n");   // Pop left operand result from the stack into rcx
+
+            if (strcmp(node->binary_op.operator, "+") == 0) {
+                fprintf(output, "\taddq %%rcx, %%rax\n");  // rax = rcx + rax
+            } else if (strcmp(node->binary_op.operator, "-") == 0) {
+                fprintf(output, "\tsubq %%rax, %%rcx\n");
+                fprintf(output, "\tmovq %%rcx, %%rax\n");  // rax = rcx - rax
+            } else if (strcmp(node->binary_op.operator, "*") == 0) {
+                fprintf(output, "\timulq %%rcx, %%rax\n"); // rax = rcx * rax
+            } else if (strcmp(node->binary_op.operator, "/") == 0) {
+                fprintf(output, "\tcqo\n");               // Sign-extend rax into rdx
+                fprintf(output, "\tidivq %%rcx\n");       // rax = rdx:rax / rcx
+            }
+            // Add more operators as needed
             break;
-        // Add more expression types as needed
-        default:
-            fprintf(stderr, "Unsupported expression type\n");
-            exit(1);
-    }
-}
 
-// Generate code for print statements
-void generate_print_statement(FILE* output, struct ast_node* node) {
-    generate_expression(output, node->print.expression);
-    fprintf(output, "    movq %%rax, %%rsi\n");
-    fprintf(output, "    movq $print_format, %%rdi\n");
-    fprintf(output, "    xorq %%rax, %%rax\n");
-    fprintf(output, "    call printf\n");
-}
-
-// Generate code for variable declarations
-void generate_declaration(FILE* output, struct ast_node* node) {
-    if (node->declaration.initial_value) {
-        generate_expression(output, node->declaration.initial_value);
-    } else {
-        fprintf(output, "    xorq %%rax, %%rax\n");
-    }
-    fprintf(output, "    pushq %%rax\n");
-}
-
-// Generate code for return statements
-void generate_return_statement(FILE* output, struct ast_node* node) {
-    if (node->return_stmt.value) {
-        generate_expression(output, node->return_stmt.value);
-    }
-    fprintf(output, "    leave\n");
-    fprintf(output, "    ret\n");
-}
-
-// Generate code for if statements
-void generate_if_statement(FILE* output, struct ast_node* node) {
-    char* else_label = generate_label();
-    char* end_label = generate_label();
-
-    generate_expression(output, node->if_stmt.condition);
-    fprintf(output, "    cmp $0, %%rax\n");
-    fprintf(output, "    je %s\n", else_label);
-
-    generate_statement(output, node->if_stmt.true_body);
-    fprintf(output, "    jmp %s\n", end_label);
-
-    fprintf(output, "%s:\n", else_label);
-    if (node->if_stmt.false_body) {
-        generate_statement(output, node->if_stmt.false_body);
-    }
-
-    fprintf(output, "%s:\n", end_label);
-
-    free(else_label);
-    free(end_label);
-}
-
-// Generate code for while loops
-void generate_while_loop(FILE* output, struct ast_node* node) {
-    char* start_label = generate_label();
-    char* end_label = generate_label();
-
-    fprintf(output, "%s:\n", start_label);
-    generate_expression(output, node->while_loop.condition);
-    fprintf(output, "    cmp $0, %%rax\n");
-    fprintf(output, "    je %s\n", end_label);
-
-    generate_statement(output, node->while_loop.body);
-    fprintf(output, "    jmp %s\n", start_label);
-
-    fprintf(output, "%s:\n", end_label);
-
-    free(start_label);
-    free(end_label);
-}
-
-// Generate code for statements
-void generate_statement(FILE* output, struct ast_node* node) {
-    switch (node->type) {
-        case AST_PRINT:
-            generate_print_statement(output, node);
+        case AST_IDENTIFIER:
+            // Load variable value into rax
+            fprintf(output, "\tmovq -%d(%%rbp), %%rax\n", get_variable_offset(node->id_literal.value));
             break;
+
+        case AST_NUMBER:
+            // Load immediate value into rax
+            fprintf(output, "\tmovq $%s, %%rax\n", node->id_literal.value);
+            break;
+
+        // Add more cases as needed
+    }
+}
+
+
+
+// // Helper function to get variable offset (you need to implement this)
+int get_variable_offset(const char* name) {
+    // This function should return the stack offset for the given variable
+    // You might need to maintain a symbol table to track variable offsets
+    // For now, we'll return a fixed offset as a placeholder
+    return 8;
+}
+
+void generate_print_int(FILE* output) {
+    // Convert integer to string and print
+    fprintf(output, "\t# Convert integer to string and print\n");
+    fprintf(output, "\tmovq $10, %%r9\n");  // Divisor
+    fprintf(output, "\tmovq $0, %%r10\n");  // Digit count
+    fprintf(output, "\tmovq %%rax, %%rcx\n");  // Copy number to rcx
+
+    // Handle negative numbers
+    fprintf(output, "\ttestq %%rcx, %%rcx\n");
+    fprintf(output, "\tjns .Lpositive_%d\n", label_counter);
+    fprintf(output, "\tnegq %%rcx\n");
+    fprintf(output, "\tmovq $45, (%%rsp)\n");  // ASCII '-'
+    fprintf(output, "\tdecq %%rsp\n");
+    fprintf(output, "\tincq %%r10\n");
+
+    fprintf(output, ".Lpositive_%d:\n", label_counter);
+    // Convert to ASCII and push onto stack
+    fprintf(output, ".Lconvert_loop_%d:\n", label_counter);
+    fprintf(output, "\txorq %%rdx, %%rdx\n");
+    fprintf(output, "\tdivq %%r9\n");
+    fprintf(output, "\taddq $48, %%rdx\n");  // Convert to ASCII
+    fprintf(output, "\tdecq %%rsp\n");
+    fprintf(output, "\tmovb %%dl, (%%rsp)\n");
+    fprintf(output, "\tincq %%r10\n");
+    fprintf(output, "\ttestq %%rax, %%rax\n");
+    fprintf(output, "\tjnz .Lconvert_loop_%d\n", label_counter);
+
+    // Print the number
+    fprintf(output, "\tmovq %%r10, %%rdx\n");  // Length
+    fprintf(output, "\tmovq %%rsp, %%rsi\n");  // Buffer
+    fprintf(output, "\tmovq $1, %%rdi\n");     // File descriptor (stdout)
+    fprintf(output, "\tmovq $1, %%rax\n");     // System call number (sys_write)
+    fprintf(output, "\tsyscall\n");
+
+    // Print newline
+    fprintf(output, "\tmovq $10, (%%rsp)\n");  // ASCII newline
+    fprintf(output, "\tmovq $1, %%rdx\n");     // Length
+    fprintf(output, "\tmovq %%rsp, %%rsi\n");  // Buffer
+    fprintf(output, "\tmovq $1, %%rdi\n");     // File descriptor (stdout)
+    fprintf(output, "\tmovq $1, %%rax\n");     // System call number (sys_write)
+    fprintf(output, "\tsyscall\n");
+
+    // Restore stack
+    fprintf(output, "\taddq %%r10, %%rsp\n");
+    fprintf(output, "\tincq %%rsp\n");
+
+    label_counter++;
+}
+void generate_print_string(FILE* output, const char* string) {
+    fprintf(output, "\t# Print string\n");
+    fprintf(output, "\tmovq $1, %%rax\n");  // syscall number for sys_write
+    fprintf(output, "\tmovq $1, %%rdi\n");  // file descriptor 1 is stdout
+    fprintf(output, "\tmovq $.LC%d, %%rsi\n", label_counter);  // address of string to output
+    fprintf(output, "\tmovq $%zu, %%rdx\n", strlen(string));  // number of bytes
+    fprintf(output, "\tsyscall\n");
+
+    // Print newline
+    fprintf(output, "\tmovq $1, %%rax\n");
+    fprintf(output, "\tmovq $1, %%rdi\n");
+    fprintf(output, "\tmovq $.LC%d, %%rsi\n", label_counter + 1);
+    fprintf(output, "\tmovq $1, %%rdx\n");
+    fprintf(output, "\tsyscall\n");
+
+    label_counter += 2;
+}
+void generate_code(FILE* output, struct ast_node* root) {
+    if (!root) return;
+
+     static int data_section_added = 0;
+    switch (root->type) {
+        case AST_FUNCTION_DEFINITION:
+            generate_function_prologue(output, root->function_def.name);
+            generate_code(output, root->function_def.body);
+            generate_function_epilogue(output);
+            break;
+
         case AST_DECLARATION:
-            generate_declaration(output, node);
+            // Allocate space for the variable on the stack
+            static int stack_offset = 8;
+            fprintf(output, "\tsubq $%d, %%rsp\n", get_type_size(root->declaration.type));
+            generate_variable_assignment(output, root->declaration.name, stack_offset, "0");
+            stack_offset += get_type_size(root->declaration.type);
             break;
-        case AST_RETURN:
-            generate_return_statement(output, node);
+
+        case AST_BINARY_OP:
+            if (strcmp(root->binary_op.operator, "=") == 0) {
+                // Variable assignment
+                struct ast_node* lhs = root->binary_op.left;
+                struct ast_node* rhs = root->binary_op.right;
+                generate_expression(output, rhs);  // Compute right-hand side and store in rax
+                if (lhs->type == AST_IDENTIFIER) {
+                    fprintf(output, "\tmovq %%rax, -%d(%%rbp)\n", get_variable_offset(lhs->id_literal.value));
+                }
+            } else {
+                generate_expression(output, root);  // For other binary operations
+            }
             break;
-        case AST_IF_STMT:
-            generate_if_statement(output, node);
-            break;
-        case AST_WHILE_LOOP:
-            generate_while_loop(output, node);
+
+        case AST_PRINT:
+            if (root->print.expression->type == AST_STRING) {
+                if (!data_section_added) {
+                    fprintf(output, "\t.section .rodata\n");
+                    data_section_added = 1;
+                }
+                fprintf(output, ".LC%d:\n", label_counter);
+                fprintf(output, "\t.string %s\n", root->print.expression->id_literal.value);
+                fprintf(output, ".LC%d:\n", label_counter + 1);
+                fprintf(output, "\t.string \"\\n\"\n");
+                fprintf(output, "\t.text\n");
+                generate_print_string(output, root->print.expression->id_literal.value);
+            } else {
+                generate_expression(output, root->print.expression);
+                generate_print_int(output);  // Assuming we keep this for integer printing
+            }
             break;
         case AST_BLOCK:
-            for (int i = 0; i < node->block.stmt_count; i++) {
-                generate_statement(output, node->block.statements[i]);
+            for (int i = 0; i < root->block.stmt_count; i++) {
+                generate_code(output, root->block.statements[i]);
             }
             break;
-        // Add more statement types as needed
-        default:
-            fprintf(stderr, "Unsupported statement type\n");
-            exit(1);
-    }
-}
 
-// Generate code for function definitions
-void generate_function(FILE* output, struct ast_node* node) {
-    fprintf(output, ".globl %s\n", node->function_def.name);
-    fprintf(output, "%s:\n", node->function_def.name);
-    fprintf(output, "    pushq %%rbp\n");
-    fprintf(output, "    movq %%rsp, %%rbp\n");
-
-    // Allocate space for local variables
-    int local_var_count = count_local_variables(node->function_def.body);
-    if (local_var_count > 0) {
-        fprintf(output, "    subq $%d, %%rsp\n", 8 * local_var_count);
-    }
-
-    generate_statement(output, node->function_def.body);
-
-    // If there's no explicit return, add one
-    if (node->function_def.body->type != AST_RETURN) {
-        fprintf(output, "    leave\n");
-        fprintf(output, "    ret\n");
-    }
-}
-
-// Main code generation function
-void generate_code(FILE* output, struct ast_node* root) {
-    
-    fprintf(output, ".data\n");
-    fprintf(output, "print_format: .asciz \"%%d\\n\"\n");
-    fprintf(output, ".text\n");
-    
-
-    for (int i = 0; i < root->root.stmt_count; i++) {
-        
-        struct ast_node* node = root->root.statements[i];
-        if (node->type == AST_FUNCTION_DEFINITION) {
-            // printf("hello from generator\n");
-            generate_function(output, node);
-        }
-        else if(node->type == AST_DECLARATION){
-                // Handle global variables
-                fprintf(output, ".globl %s\n", node->declaration.name);
-                fprintf(output, "%s:\n", node->declaration.name);
-                if (node->declaration.initial_value) {
-                    fprintf(output, "    .quad %s\n", node->declaration.initial_value->id_literal.value);
-                } else {
-                    fprintf(output, "    .quad 0\n");
-                }
-                break;
-        }
-        // Handle global variables or other top-level constructs if needed
-    }
-}
-
-// Helper function to count local variables in a function body
-int count_local_variables(struct ast_node* node) {
-    int count = 0;
-    if (node->type == AST_BLOCK) {
-        for (int i = 0; i < node->block.stmt_count; i++) {
-            if (node->block.statements[i]->type == AST_DECLARATION) {
-                count++;
+        case AST_ROOT:
+            fprintf(output, "\t.file \"test.s\"\n");
+            fprintf(output, "\t.text\n");
+            for (int i = 0; i < root->root.stmt_count; i++) {
+                generate_code(output, root->root.statements[i]);
             }
-        }
+            fprintf(output, "\t.section .note.GNU-stack,\"\",@progbits\n");
+        // Add more cases as needed
     }
-    return count;
-}
-
-// Helper function to get variable offset (you'll need to implement this)
-int get_variable_offset(const char* name) {
-    // This function should return the stack offset for a given variable
-    // You'll need to implement a symbol table to track this
-    // For now, we'll just return a placeholder value
-    return 8;
 }
