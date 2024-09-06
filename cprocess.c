@@ -55,37 +55,48 @@ void compile_process_push_char(struct lex_process* lex_process, char c) {
     ungetc(c, compiler->cfile.fp);  
 }
 
-bool parse_process_match(struct parse_process* parser, int type, const char* value) {
-    struct token* current_token = vector_get(parser->token_vector, parser->index);
-    if (current_token->type == type && strcmp(current_token->sval, value) == 0) {
-        return true;
-    }
-    return false;
-}
+// bool parse_process_match(struct parse_process* parser, int type, const char* value) {
+//     struct token* current_token = vector_get(parser->token_vector, parser->index);
+//     if (current_token->type == type && strcmp(current_token->sval, value) == 0) {
+//         return true;
+//     }
+//     return false;
+// }
 
-bool parse_process_consume(struct parse_process* parser, int type, const char* value) {
-    if (parse_process_match(parser, type, value)) {
-        get_next_token(parser);
-        return true;
-    }
-    return false;
-}
+// bool parse_process_consume(struct parse_process* parser, int type, const char* value) {
+//     if (parse_process_match(parser, type, value)) {
+//         get_next_token(parser);
+//         return true;
+//     }
+//     return false;
+// }
 
 struct token* get_next_token(struct parse_process* parser) {
     if (parser->index < parser->token_vector_count) {
         return vector_get(parser->token_vector, parser->index++);
     }
-    struct token* eof_token = (struct token*) malloc(sizeof(struct token));
-    eof_token->type = TOKEN_TYPE_EOF;
-    return eof_token;
+    return NULL;
 }
 
 struct token* peek_next_token(struct parse_process* parser) {
     if (parser->index < parser->token_vector_count) {
-        // printf("%d, %s\n", parser->index, ((struct token*)vector_get(parser->token_vector, parser->index))->sval);
         return vector_get(parser->token_vector, parser->index);
     }
-    struct token* eof_token = (struct token*) malloc(sizeof(struct token));
-    eof_token->type = TOKEN_TYPE_EOF;
-    return eof_token;
+    return NULL;
 }
+// bool parse_process_match(struct parse_process* parser, int type, const char* value) {
+//     struct token* token = peek_next_token(parser);
+//     if (token && token->type == type && 
+//         (value == NULL || strcmp(token->sval, value) == 0)) {
+//         parser->index++;
+//         return true;
+//     }
+//     return false;
+// }
+// void parse_process_expect(struct parse_process* parser, int type, const char* value) {
+//     if (!parse_process_match(parser, type, value)) {
+//         struct token* token = peek_next_token(parser);
+//         compiler_error(parser->compiler, "Expected token type %d with value '%s', but got type %d with value '%s'",
+//                        type, value, token ? token->type : -1, token ? token->sval : "EOF");
+//     }
+// }

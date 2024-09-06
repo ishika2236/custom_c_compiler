@@ -13,6 +13,7 @@ struct parse_process_functions parse_process_functions =
     // .next_token = parse_process_next_token,
     .next_token = get_next_token,
     .peek_token= peek_next_token,
+    
 };
 int compile_file(const char* filename, const char* out_filename, int flags)
 {
@@ -65,8 +66,8 @@ int compile_file(const char* filename, const char* out_filename, int flags)
     if (!parse_process) {
         return COMPILER_FAILED_WITH_ERRORS;
     }
-    parse_process -> token_vector = process-> token_vec;
-    if(parse_program(parse_process) != PARSER_ANALYSIS_ALL_OK)
+    // parse_process -> token_vector = process-> token_vec;
+    if(parse(parse_process) != PARSER_ANALYSIS_ALL_OK)
     {
         return PARSER_FAILED_WITH_ERRORS;
     }

@@ -1,4 +1,4 @@
-OBJECTS = ./build/compiler.o ./build/cprocess.o ./build/token.o ./build/helpers/vector.o ./build/node.o ./build/helpers/buffer.o ./build/lexer.o ./build/parser.o ./build/parse_process.o ./build/lex_process.o
+OBJECTS = ./build/compiler.o ./build/cprocess.o ./build/token.o ./build/helpers/vector.o ./build/node.o ./build/helpers/buffer.o ./build/lexer.o ./build/parser2.o ./build/parse_process.o ./build/lex_process.o
 #OBJECTS= list of object files that need to be linked together in order to create final executable
 
 INCLUDES = -I./
@@ -26,8 +26,8 @@ all : ${OBJECTS}
 ./build/token.o : ./token.c 
 	gcc ./token.c ${INCLUDES}  -o ./build/token.o -g -c
 
-./build/parser.o : ./parser.c 
-	gcc ./parser.c ${INCLUDES}  -o ./build/parser.o -g -c
+./build/parser2.o : ./parser2.c 
+	gcc ./parser2.c ${INCLUDES}  -o ./build/parser2.o -g -c
 
 ./build/parse_process.o : ./parse_process.c 
 	gcc ./parse_process.c ${INCLUDES}  -o ./build/parse_process.o -g -c

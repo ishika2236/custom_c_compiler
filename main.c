@@ -1,20 +1,20 @@
-#include <stdio.h>
-#include "helpers/vector.h"
-#include "compiler.h"
+    #include <stdio.h>
+    #include "helpers/vector.h"
+    #include "compiler.h"
 
 
-int main()
-{
-    int res = compile_file("./test.c", "./test.o",0);
-    if (res == COMPILER_FILE_COMPILED_OK)
+    int main()
     {
-        printf("file compiled successfully\n");
+        int res = compile_file("./test.c", "./test.o",0);
+        if (res == COMPILER_FILE_COMPILED_OK)
+        {
+            printf("file compiled successfully\n");
+        }
+        else if(res == COMPILER_FAILED_WITH_ERRORS){
+            printf("file compilation failed\n");
+        }
+        else{
+            printf("Unknown error occurred\n");
+        }
+        return 0;
     }
-    else if(res == COMPILER_FAILED_WITH_ERRORS){
-        printf("file compilation failed\n");
-    }
-    else{
-        printf("Unknown error occurred\n");
-    }
-    return 0;
-}
