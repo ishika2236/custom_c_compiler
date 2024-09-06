@@ -36,7 +36,7 @@ static bool check_and_consume(struct parse_process* parser, int type, const char
 struct ast_node* parse_primary(struct parse_process* parser) {
     printf("Parsing primary...\n");
     struct token* token = (struct token*) vector_get(parser->token_vector, parser->index);
-
+    // printf("%d\n" ,token->type);
     // printf("inside primary block %d\n", token->type);
     if (!token) {
         printf("Error: Expected primary expression, but token is NULL\n");
@@ -53,7 +53,7 @@ struct ast_node* parse_primary(struct parse_process* parser) {
             char* buffer = (char*)malloc(21 * sizeof(char)); 
             sprintf(buffer, "%llu", token -> llnum); 
             node = create_id_literal_node(AST_NUMBER, token->pos, buffer);
-            // printf("Parsed number: %lld\n", token->llnum);
+            printf("Parsed number: %lld\n", token->llnum);
             break;
         case TOKEN_TYPE_STRING:
             node = create_id_literal_node(AST_LITERAL, token->pos, token->sval);
@@ -82,7 +82,6 @@ struct ast_node* parse_primary(struct parse_process* parser) {
 struct ast_node* parse_print_statement(struct parse_process* parser) {
     printf("Parsing print statement...\n");
     struct token* print_token = consume_token(parser);
-    printf("print token: %s\n", print_token->sval);
     // parser->index++;
     struct token* token = (struct token*) vector_get(parser->token_vector, parser->index);
     // printf("%s\n", token->sval);
@@ -95,7 +94,7 @@ struct ast_node* parse_print_statement(struct parse_process* parser) {
     
     struct ast_node* expression = parse_expression(parser);
      token = (struct token*) vector_get(parser->token_vector, parser->index);
-     printf("%c\n", token->cval);
+    //  printf("%c\n", token->cval);
     if ( token -> type != TOKEN_TYPE_SYMBOL && token -> cval == ')') {
         compiler_error(parser->compiler, "Expected closing parenthesis");
         printf("Error: Expected closing parenthesis in print statement\n");
@@ -119,10 +118,14 @@ struct ast_node* parse_expression(struct parse_process* parser) {
     if (!left) return NULL;
 
     while (true) {
-        struct token* token = peek_next_token(parser);
+        struct token* token = vector_get(parser->token_vector, parser->index+1);
+        // printf("token next :%d\n", token -> type);
         if (!token || token->type != TOKEN_TYPE_OPERATOR) break;
 
-        consume_token(parser);
+        // consume_token(parser);
+        parser -> index ++;
+        token = vector_get(parser->token_vector, parser->index);
+        parser -> index ++;
         // printf("Parsed operator: %s\n", token->sval);
         struct ast_node* right = parse_primary(parser);
         if (!right) {
@@ -338,31 +341,37 @@ struct ast_node* parse_while_statement(struct parse_process* parser) {
 
 struct ast_node* parse_if_statement(struct parse_process* parser) {
     printf("Parsing if statement...\n");
-    struct token* if_token = consume_token(parser);
-    
-    if (!check_and_consume(parser, TOKEN_TYPE_SYMBOL, "(")) {
+    // struct token* token = 
+    struct token* if_token = vector_get(parser->token_vector, parser->index);
+    parser->index++;
+    struct token* token = vector_get(parser->token_vector, parser->index);
+    if (token->type != TOKEN_TYPE_SYMBOL || token->cval != '(' ) {
         compiler_error(parser->compiler, "Expected opening parenthesis");
         printf("Error: Expected opening parenthesis in if statement\n");
         return NULL;
     }
+    parser->index++;
     
     struct ast_node* condition = parse_expression(parser);
-    
-    if (!check_and_consume(parser, TOKEN_TYPE_SYMBOL, ")")) {
+    token = vector_get(parser->token_vector, parser->index);
+    if (token->type != TOKEN_TYPE_SYMBOL || token->cval != ')' ) {
         compiler_error(parser->compiler, "Expected closing parenthesis");
         printf("Error: Expected closing parenthesis in if statement\n");
         free_ast_node(condition);
         return NULL;
     }
+    parser -> index ++;
     
     struct ast_node* then_branch = parse_statement(parser);
-    
+    token = vector_get(parser->token_vector, parser->index);
     struct ast_node* else_branch = NULL;
-    if (check_and_consume(parser, TOKEN_TYPE_IDENTIFIER, "else")) {
+    if (token->type == TOKEN_TYPE_IDENTIFIER && token->sval == "else" ) {
         else_branch = parse_statement(parser);
     }
+    parser->index++;
     
     struct ast_node* if_node = create_if_stmt_node(if_token->pos, condition, then_branch, else_branch);
+
     return if_node;
 }
 

@@ -11,7 +11,29 @@ static char* generate_label() {
     sprintf(label, "L%d", label_counter++);
     return label;
 }
+struct symbol {
+    char* name;
+    int offset;
+};
 
+struct symbol symbol_table[100];  // Adjust size as needed
+int symbol_count = 0;
+
+void add_symbol(const char* name, int offset) {
+    symbol_table[symbol_count].name = strdup(name);
+    symbol_table[symbol_count].offset = offset;
+    symbol_count++;
+}
+
+int get_variable_offset(const char* name) {
+    for (int i = 0; i < symbol_count; i++) {
+        if (strcmp(symbol_table[i].name, name) == 0) {
+            return symbol_table[i].offset;
+        }
+    }
+    fprintf(stderr, "Error: Variable %s not found\n", name);
+    exit(1);
+}
 // Helper function to get the size of a type
 static int get_type_size(const char* type) {
     if (strcmp(type, "int") == 0) return 8;  // 64-bit integers
@@ -82,13 +104,6 @@ void generate_expression(FILE* output, struct ast_node* node) {
 
 
 
-// // Helper function to get variable offset (you need to implement this)
-int get_variable_offset(const char* name) {
-    // This function should return the stack offset for the given variable
-    // You might need to maintain a symbol table to track variable offsets
-    // For now, we'll return a fixed offset as a placeholder
-    return 8;
-}
 
 void generate_print_int(FILE* output) {
     // Convert integer to string and print
@@ -160,6 +175,9 @@ void generate_code(FILE* output, struct ast_node* root) {
 
      static int data_section_added = 0;
     switch (root->type) {
+        case AST_IDENTIFIER:
+            fprintf(output, "\tmovq -%d(%%rbp), %%rax\n", get_variable_offset(root->id_literal.value));
+            break;
         case AST_FUNCTION_DEFINITION:
             generate_function_prologue(output, root->function_def.name);
             generate_code(output, root->function_def.body);
@@ -167,44 +185,37 @@ void generate_code(FILE* output, struct ast_node* root) {
             break;
 
         case AST_DECLARATION:
-            // Allocate space for the variable on the stack
             static int stack_offset = 8;
             fprintf(output, "\tsubq $%d, %%rsp\n", get_type_size(root->declaration.type));
-            generate_variable_assignment(output, root->declaration.name, stack_offset, "0");
+            add_symbol(root->declaration.name, stack_offset);
+            if (root->declaration.initial_value) {
+                generate_expression(output, root->declaration.initial_value);
+                fprintf(output, "\tmovq %%rax, -%d(%%rbp)\n", stack_offset);
+            } else {
+                generate_variable_assignment(output, root->declaration.name, stack_offset, "0");
+            }
             stack_offset += get_type_size(root->declaration.type);
             break;
-
         case AST_BINARY_OP:
-            if (strcmp(root->binary_op.operator, "=") == 0) {
-                // Variable assignment
-                struct ast_node* lhs = root->binary_op.left;
-                struct ast_node* rhs = root->binary_op.right;
-                generate_expression(output, rhs);  // Compute right-hand side and store in rax
-                if (lhs->type == AST_IDENTIFIER) {
-                    fprintf(output, "\tmovq %%rax, -%d(%%rbp)\n", get_variable_offset(lhs->id_literal.value));
-                }
-            } else {
-                generate_expression(output, root);  // For other binary operations
+        if (strcmp(root->binary_op.operator, "=") == 0) {
+            struct ast_node* lhs = root->binary_op.left;
+            struct ast_node* rhs = root->binary_op.right;
+            generate_expression(output, rhs);  // Compute right-hand side and store in rax
+            if (lhs->type == AST_IDENTIFIER) {
+                fprintf(output, "\tmovq %%rax, -%d(%%rbp)\n", get_variable_offset(lhs->id_literal.value));
             }
-            break;
+        } else {
+            generate_expression(output, root);
+        }
+    break;
 
         case AST_PRINT:
-            if (root->print.expression->type == AST_STRING) {
-                if (!data_section_added) {
-                    fprintf(output, "\t.section .rodata\n");
-                    data_section_added = 1;
-                }
-                fprintf(output, ".LC%d:\n", label_counter);
-                fprintf(output, "\t.string %s\n", root->print.expression->id_literal.value);
-                fprintf(output, ".LC%d:\n", label_counter + 1);
-                fprintf(output, "\t.string \"\\n\"\n");
-                fprintf(output, "\t.text\n");
-                generate_print_string(output, root->print.expression->id_literal.value);
-            } else {
-                generate_expression(output, root->print.expression);
-                generate_print_int(output);  // Assuming we keep this for integer printing
-            }
+            
+            generate_expression(output, root->print.expression);
+            generate_print_int(output);
             break;
+
+
         case AST_BLOCK:
             for (int i = 0; i < root->block.stmt_count; i++) {
                 generate_code(output, root->block.statements[i]);
